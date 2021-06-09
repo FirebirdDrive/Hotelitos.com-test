@@ -1,0 +1,146 @@
+function removeService(req,res){
+    var params = req.body();
+
+    Services.findOne({description: capitalize.capitalizeFirstValue(params.ServiceName) }, (err, findService) => {
+        if(err){
+            return res.status(404).send({message: "General error while searching the Service."})
+        }else if(findService){
+           Hotel.findOne({name: capitalize.capitalizeFirstValue(params.HotelName) }, (err, findHotel) => {
+               if(err){
+                   return res.status(404).send({message: "General error while searching the Hotel."})
+               }else if(findHotel){
+                   Hotel.findByIdAndUpdate({_id: findHotel._id, services: findService._id}, {$pull:{services: findService._id}}, {new:true}, (err,servicePull)=>{
+                        if(err){
+                            console.log(err);
+                            return res.status(500).send({message: 'General error'});
+                        }else if(servicePull){
+                            Service.findByIdAndRemove(findService._id, (err, serviceRemoved)=>{
+                                if(err){
+                                     return res.status(404).send({message: "Error while trying to delete"})
+                                }else if(serviceRemoved){
+                                     return res.send({message: 'Service deleted', servicePull});
+                                }else{
+                                    return res.status(404).send({message: "This service doesnt exist or it was already deleted"})
+                                }
+                            })
+                    }else{
+                        return res.status(500).send({message: 'The hotel service it couldnt be deleted'});
+                        }
+                    })
+               }else{
+                   return res.status(404).send({message: "There is no Hotel!."})
+               }
+           })
+        }else{
+            return res.status(404).send({message: "There is no Service!."})
+        }
+    })
+}
+
+function removeEvent(req,res){
+    var params = req.body();
+
+    Event.findOne({name: capitalize.capitalizeFirstValue(params.EventName) }, (err, findEvent) => {
+        if(err){
+            return res.status(404).send({message: "General error while searching the Event."})
+        }else if(findEvent){
+           Hotel.findOne({name: capitalize.capitalizeFirstValue(params.HotelName) }, (err, findHotel) => {
+               if(err){
+                   return res.status(404).send({message: "General error while searching the Hotel."})
+               }else if(findHotel){
+                   Hotel.findByIdAndUpdate({_id: findHotel._id, events: findEvent._id}, {$pull:{events: findEvent._id}}, {new:true}, (err,eventPull)=>{
+                        if(err){
+                            console.log(err);
+                            return res.status(500).send({message: 'General error'});
+                        }else if(eventPull){
+                            Event.findByIdAndRemove(findEvent._id, (err, eventRemoved)=>{
+                                if(err){
+                                     return res.status(404).send({message: "Error while trying to delete"})
+                                }else if(eventRemoved){
+                                     return res.send({message: 'Event deleted', eventPull});
+                                }else{
+                                    return res.status(404).send({message: "This event doesnt exist or it was already deleted"})
+                                }
+                            })
+                    }else{
+                        return res.status(500).send({message: 'The hotel Event it couldnt be deleted'});
+                        }
+                    })
+               }else{
+                   return res.status(404).send({message: "There is no Hotel!."})
+               }
+           })
+        }else{
+            return res.status(404).send({message: "There is no Event!."})
+        }
+    })
+}
+
+
+function setReservation(req,res){
+    var booking = new Booking();
+    var params = req.body();
+
+    Room.findOne({name: capitalize.capitalizeFirstValue(params.RoomName) }, (err, findRoom) => {
+        if(err){
+            res.status(404).send({message: "Error while searching the room"})
+        }else if(findRoom){
+            if(findRoom.availability =="UNAVAILABLE"){
+                return res.status(404).send({message: "This room was already reserved!"})
+            }
+            if(findRoom.quantity <= 0){
+                Room.findByIdAndUpdate({_id: findRoom._id}, {availability: "UNAVAILABLE"}, {new:true}, (err, statusUpdate)=>{
+                    if(err){
+                        return res.status(404).send({message: "Error in the status"})
+                    }else if(statusUpdate){
+                        return res.status(400).send({message: "There is no rooms available"})
+                    }else{
+                        return res.status(404).send({message: "Error updating the status"})
+                    }
+                })
+            }else{
+                Room.findByIdAndUpdate({_id: findRoom._id}, {quantity: findRoom.quantity-1}, {new:true}, (err, roomUpdate)=>{
+                    if(err){
+                        return res.status(404).send({message: "Error in the room data"})
+                    }else if(roomUpdate){
+                        booking.endDate = tomorrow.setDate(tomorrow.getDate()+1);
+                        booking.save((err, bookingSaved)=>{
+                            if(err){
+                                return res.status(404).send({message: "General error in the booking"})
+                            }else if(bookingSaved){
+                                Hotel.findOne({name: capitalize.capitalizeFirstValue(params.HotelName) }, (err, findHotel) => {
+                                    if(err){
+                                        return res.status(404).send({message: "General error while searching the Hotel."})
+                                    }else if(findHotel){
+                                        Hotel.findByIdAndUpdate(findHotel._id, {$push:{bookings: bookingSaved._id}}, {new:true}, (err, hotelUpdate)=>{
+                                            if(err){
+                                                return res.status(404).send({message: "Error in the hotel"})
+                                            }else if(hotelUpdate){
+                                                Booking.findByIdAndUpdate(bookingSaved._id, {$push:{room: roomUpdate._id}}, {new:true}, (err, bookingUpdate)=>{
+                                                     if(err){
+                                                        return res.status(404).send({message: "Error in the reservation"})
+                                                    }else if(bookingUpdate){
+                                                        return res.status(404).send({message: "Reservation created", bookingUpdate})
+                                                    }else{
+                                                        return res.status(404).send({message: "Error while trying to save the reservation"})
+                                                    }
+                                                 })
+                                        }else{
+                                            return res.status(404).send({message: "Error while trying to update the hotel"})
+                                        }
+                                })
+                                    }else{
+                                        return res.status(404).send({message: "There is no Hotel!."})
+                                    }   
+                                })
+                            }else{
+                                return res.status(404).send({message: "Error while saving the reservaiton"})
+                            }
+                    })
+        }else{
+            return res.status(500).send({message: "There is no room!"})
+        }
+    )}
+}
+
+
